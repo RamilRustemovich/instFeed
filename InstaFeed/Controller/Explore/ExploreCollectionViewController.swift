@@ -25,14 +25,10 @@ class ExploreCollectionViewController: UICollectionViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
-//        // Uncomment the following line to preserve selection between presentations
-//        // self.clearsSelectionOnViewWillAppear = false
-//
-//        // Register cell classes
-//        self.collectionView!.register(UICollectionViewCell.self, forCellWithReuseIdentifier: reuseIdentifier)
-//
-//        // Do any additional setup after loading the view.
+        
+        // configure the search bar
+        navigationItem.titleView = searchBar
+        searchBar.delegate = self
         
         // configure the collection view
         collectionView?.backgroundColor = .white
@@ -72,12 +68,12 @@ class ExploreCollectionViewController: UICollectionViewController {
         }
     }
     
-    func urlWithSearchText(searchText: String) -> URL {
+    func urlWithSearchText(searchText: String) -> URL? {
         let escapedSearchText = searchText.replacingOccurrences(of: " ", with: "")
         let urlString = "https://api.instagram.com/v1/tags/\(escapedSearchText)/media/recent?access_token=" + String(accesToken)
         
         //let urlString3 = "https://api.instagram.com/v1/tags/\(escapedSearchText)/media/recent?access_token=8508776244.51bac4a.21bfffbe80de4fe5a5a4b03d31a1dd56"
-        return URL(string: urlString)!
+        return URL(string: urlString)
     }
     
     func fetchPhotos() {
@@ -85,9 +81,13 @@ class ExploreCollectionViewController: UICollectionViewController {
         let url: URL
         
         if !(searchBar.text?.isEmpty)! {
-            url = urlWithSearchText(searchText: searchBar.text!)
+            if let url2 = urlWithSearchText(searchText: searchBar.text!) {
+                url = url2
+            } else {
+                url = urlWithSearchText(searchText: "")! }
+                //url = urlWithSearchText(searchText: searchBar.text!) - это как в видео, просто сразу код
         } else {
-            url = urlWithSearchText(searchText: "car")
+            url = urlWithSearchText(searchText: "car")!
         }
         
         let request = URLRequest(url: url)
@@ -98,7 +98,6 @@ class ExploreCollectionViewController: UICollectionViewController {
                 do {
                     let responseDictionary = try JSONSerialization.jsonObject(with: data! as Data, options: .allowFragments) as! [String: Any]
                     self?.photoDictionaries = responseDictionary["data"] as! [AnyObject]
-                    print(self?.photoDictionaries ?? "nooooooooooooooo")
                 } catch let error {
                     print(error)
                 }
@@ -118,44 +117,58 @@ class ExploreCollectionViewController: UICollectionViewController {
     override func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return photoDictionaries.count
     }
-
+    
     override func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: Storyboard.explorePhotoCell, for: indexPath) as! ExplorePhotoCollectionViewCell
-        //cell.imageView.image = UIImage(named: "no_image")
+        //cell.imageView.image = UIImage(named: "no_image") а если не будет картинки??
         let photoDictionary = photoDictionaries[indexPath.item]
         cell.photo = photoDictionary
+        
+        if let likes = photoDictionary.value(forKeyPath: "likes.count") {
+            cell.likes = String(describing: likes)
+        }
         return cell
     }
-
-    // MARK: UICollectionViewDelegate
-
-    /*
-    // Uncomment this method to specify if the specified item should be highlighted during tracking
-    override func collectionView(_ collectionView: UICollectionView, shouldHighlightItemAt indexPath: IndexPath) -> Bool {
-        return true
-    }
-    */
-
-    /*
-    // Uncomment this method to specify if the specified item should be selected
-    override func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
-        return true
-    }
-    */
-
-    /*
-    // Uncomment these methods to specify if an action menu should be displayed for the specified item, and react to actions performed on the item
-    override func collectionView(_ collectionView: UICollectionView, shouldShowMenuForItemAt indexPath: IndexPath) -> Bool {
-        return false
-    }
-
-    override func collectionView(_ collectionView: UICollectionView, canPerformAction action: Selector, forItemAt indexPath: IndexPath, withSender sender: Any?) -> Bool {
-        return false
-    }
-
-    override func collectionView(_ collectionView: UICollectionView, performAction action: Selector, forItemAt indexPath: IndexPath, withSender sender: Any?) {
     
+    override func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let photo = photoDictionaries[indexPath.row] as! NSDictionary
+        
+        let viewController = DetailPhotoViewController()
+        viewController.modalPresentationStyle = .custom
+        
+        viewController.transitioningDelegate = self
+        
+        viewController.photo = photo
+        present(viewController, animated: true, completion: nil)
     }
-    */
-
 }
+
+// MARK: - UISearchBarDelegate
+extension ExploreCollectionViewController: UISearchBarDelegate {
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        if !(searchBar.text?.isEmpty)! {
+            searchBar.resignFirstResponder()
+            fetchPhotos()
+        }
+    }
+}
+
+// UIViewControllerTransitioningDelegate
+extension ExploreCollectionViewController: UIViewControllerTransitioningDelegate {
+    func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        return PresentDetailTransition()
+    }
+    
+    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        return DismissDetailTransition()
+    }
+}
+
+
+
+
+
+
+
+
+
